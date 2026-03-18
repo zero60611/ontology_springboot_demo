@@ -18,6 +18,115 @@
 - Permission rule 骨架
 - Integration gateway 預留層
 
+## 白話文說明
+
+### Ontology metadata registry
+
+這個可以把它想成系統的「物件說明書」。
+
+它不是在存實際資料，而是在告訴系統：
+
+- 有哪些業務物件
+- 這些物件叫什麼
+- 可以做哪些動作
+- 跟哪些物件有關聯
+- 權限應該怎麼套用
+
+白話講，就是讓系統知道：
+
+> 這不是一筆普通資料，而是一個 `EXAM_RESPONSE`，它可以 `SUBMIT`，也可以和其他物件建立關聯。
+
+未來前端就可以根據這份 metadata 決定顯示什麼按鈕、什麼欄位、什麼操作，而不是把邏輯全部寫死。
+
+### Exam 模組的 command / query 分離
+
+這是在把「改資料」和「查資料」分開。
+
+- `command` 負責做動作，例如建立答卷、提交答卷
+- `query` 負責查畫面要看的資料，例如答卷明細、dashboard
+
+白話講：
+
+> 做事的流程，和看資料的流程，不要混在一起。
+
+這樣程式會比較清楚，也比較容易往 projection、cache、search 延伸。
+
+### 應用內事件流
+
+這是在做流程解耦。
+
+例如提交答卷後，不是由 exam 模組自己直接呼叫：
+
+- scoring
+- review
+- report
+- notification
+- analytics
+
+而是先發出一個事件：
+
+> `ExamSubmittedEvent`
+
+然後其他模組自己去監聽這個事件並接手後續處理。
+
+白話講就是：
+
+> 我只說「答卷提交了」，至於誰要評分、誰要發通知、誰要更新報表，各模組自己負責。
+
+這樣後面要加新模組時，不需要回頭大改原本的提交流程。
+
+### Dashboard 與 timeline 的 projection 骨架
+
+這是在做「給畫面看的資料版本」。
+
+交易資料通常很細、很散，但 dashboard 與 timeline 只需要整理好的結果，例如：
+
+- 總共有幾份答卷
+- 幾份已提交
+- 最近發生哪些動作
+
+所以 projection 的作用就是：
+
+> 把複雜的交易資料整理成查詢友善的畫面資料。
+
+這樣前端查詢就不用每次直接去拼很多交易資料。
+
+### Permission rule 骨架
+
+這是在做「誰可以看、誰可以做」。
+
+它不只是登入驗證，而是要描述：
+
+- 哪個角色可以看哪種物件
+- 哪個角色可以做哪個動作
+- 某些人是否只能看自己的資料
+- 某些欄位是否需要遮罩
+
+白話講就是：
+
+> 系統要知道誰能做什麼，而不是所有人登入後都看到一樣的東西。
+
+目前是骨架，之後可以再長成更完整的 policy engine。
+
+### Integration gateway 預留層
+
+這是在做「和外部系統接軌的邊界」。
+
+未來系統可能要接：
+
+- 資料庫
+- 郵件系統
+- SSO
+- 檔案儲存
+- Kafka / PubSub
+- 第三方 API
+
+如果把這些技術直接寫進核心業務流程，之後會很難替換。
+
+所以先做一層 integration gateway，白話講就是：
+
+> 先把對外插孔留好，讓核心業務不要直接綁死外部技術。
+
 ## 高層架構圖
 
 ```mermaid
@@ -161,6 +270,10 @@ flowchart TB
 ```mermaid
 classDiagram
     class ObjectType {
+        DATASET
+        PIPELINE_RUN
+        WORKFLOW_RUN
+        POLICY
         EXAM
         EXAM_RESPONSE
         REVIEW_TASK
@@ -172,6 +285,7 @@ classDiagram
     class LinkType {
         BELONGS_TO
         GENERATED_FROM
+        DERIVED_FROM
         ASSIGNED_TO
         REVIEWS
         PUBLISHED_AS
@@ -179,7 +293,9 @@ classDiagram
 
     class ActionType {
         CREATE
+        INGEST
         SUBMIT
+        EXECUTE
         ASSIGN
         SCORE
         APPROVE
